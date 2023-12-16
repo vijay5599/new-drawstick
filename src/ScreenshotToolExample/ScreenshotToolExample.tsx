@@ -1,116 +1,183 @@
 import {
-	Box2d,
-	TLEditorComponents,
-	TLUiAssetUrlOverrides,
-	TLUiOverrides,
-	Tldraw,
-	toolbarItem,
-	useEditor,
-	useValue,
-} from '@tldraw/tldraw'
-import '@tldraw/tldraw/tldraw.css'
-import { ScreenshotTool } from './ScreenshotTool/ScreenshotTool'
-import { ScreenshotDragging } from './ScreenshotTool/childStates/Dragging'
+  Box2d,
+  TLEditorComponents,
+  TLUiAssetUrlOverrides,
+  TLUiOverrides,
+  Tldraw,
+  toolbarItem,
+  useEditor,
+  useValue,
+  createTLStore,
+  defaultShapeUtils,
+  throttle,
+} from "@tldraw/tldraw";
+import "@tldraw/tldraw/tldraw.css";
+import { useLayoutEffect, useState } from "react";
+import { ScreenshotTool } from "./ScreenshotTool/ScreenshotTool";
+import { ScreenshotDragging } from "./ScreenshotTool/childStates/Dragging";
 
+const PERSISTENCE_KEY = "vijay-3";
 // There's a guide at the bottom of this file!
 
 // [1]
-const customTools = [ScreenshotTool]
+const customTools = [ScreenshotTool];
 
 // [2]
 const customUiOverrides: TLUiOverrides = {
-	tools: (editor, tools) => {
-		return {
-			...tools,
-			screenshot: {
-				id: 'screenshot',
-				label: 'Screenshot',
-				readonlyOk: false,
-				icon: 'tool-screenshot',
-				kbd: 'j',
-				onSelect() {
-					editor.setCurrentTool('screenshot')
-				},
-			},
-		}
-	},
-	toolbar: (_editor, toolbarItems, { tools }) => {
-		toolbarItems.splice(4, 0, toolbarItem(tools.screenshot))
-		return toolbarItems
-	},
-}
+  tools: (editor, tools) => {
+    return {
+      ...tools,
+      screenshot: {
+        id: "screenshot",
+        label: "Screenshot",
+        readonlyOk: false,
+        icon: "tool-screenshot",
+        kbd: "j",
+        onSelect() {
+          editor.setCurrentTool("screenshot");
+        },
+      },
+    };
+  },
+  toolbar: (_editor, toolbarItems, { tools }) => {
+    toolbarItems.splice(4, 0, toolbarItem(tools.screenshot));
+    return toolbarItems;
+  },
+};
 
 // [3]
 const customAssetUrls: TLUiAssetUrlOverrides = {
-	icons: {
-		'tool-screenshot': '/tool-screenshot.svg',
-	},
-}
+  icons: {
+    "tool-screenshot": "/tool-screenshot.svg",
+  },
+};
 
 // [4]
 function ScreenshotBox() {
-	const editor = useEditor()
+  const editor = useEditor();
 
-	const screenshotBrush = useValue(
-		'screenshot brush',
-		() => {
-			// Check whether the screenshot tool (and its dragging state) is active
-			if (editor.getPath() !== 'screenshot.dragging') return null
+  const screenshotBrush = useValue(
+    "screenshot brush",
+    () => {
+      // Check whether the screenshot tool (and its dragging state) is active
+      if (editor.getPath() !== "screenshot.dragging") return null;
 
-			// Get screenshot.dragging state node
-			const draggingState = editor.getStateDescendant<ScreenshotDragging>('screenshot.dragging')!
+      // Get screenshot.dragging state node
+      const draggingState = editor.getStateDescendant<ScreenshotDragging>(
+        "screenshot.dragging"
+      )!;
 
-			// Get the box from the screenshot.dragging state node
-			const box = draggingState.screenshotBox.get()
+      // Get the box from the screenshot.dragging state node
+      const box = draggingState.screenshotBox.get();
 
-			// The box is in "page space", i.e. panned and zoomed with the canvas, but we
-			// want to show it in front of the canvas, so we'll need to convert it to
-			// "page space", i.e. uneffected by scale, and relative to the tldraw
-			// page's top left corner.
-			const zoomLevel = editor.getZoomLevel()
-			const { x, y } = editor.pageToScreen({ x: box.x, y: box.y })
-			return new Box2d(x, y, box.w * zoomLevel, box.h * zoomLevel)
-		},
-		[editor]
-	)
+      // The box is in "page space", i.e. panned and zoomed with the canvas, but we
+      // want to show it in front of the canvas, so we'll need to convert it to
+      // "page space", i.e. uneffected by scale, and relative to the tldraw
+      // page's top left corner.
+      const zoomLevel = editor.getZoomLevel();
+      const { x, y } = editor.pageToScreen({ x: box.x, y: box.y });
+      return new Box2d(x, y, box.w * zoomLevel, box.h * zoomLevel);
+    },
+    [editor]
+  );
 
-	if (!screenshotBrush) return null
+  if (!screenshotBrush) return null;
 
-	return (
-		<div
-			style={{
-				position: 'absolute',
-				top: 0,
-				left: 0,
-				transform: `translate(${screenshotBrush.x}px, ${screenshotBrush.y}px)`,
-				width: screenshotBrush.w,
-				height: screenshotBrush.h,
-				border: '1px solid var(--color-text-0)',
-				zIndex: 999,
-			}}
-		/>
-	)
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        transform: `translate(${screenshotBrush.x}px, ${screenshotBrush.y}px)`,
+        width: screenshotBrush.w,
+        height: screenshotBrush.h,
+        border: "1px solid var(--color-text-0)",
+        zIndex: 999,
+      }}
+    />
+  );
 }
 
 const customComponents: TLEditorComponents = {
-	InFrontOfTheCanvas: () => {
-		return <ScreenshotBox />
-	},
-}
+  InFrontOfTheCanvas: () => {
+    return <ScreenshotBox />;
+  },
+};
 
 // [5]
 export default function ScreenshotToolExample() {
-	return (
-		<div className="tldraw__editor">
-			<Tldraw
-				persistenceKey="tldraw_screenshot_example"
-				tools={customTools}
-				overrides={customUiOverrides}
-				assetUrls={customAssetUrls}
-				components={customComponents}
-			/>
-		</div>
-	)
+  const [store] = useState(() =>
+    createTLStore({ shapeUtils: defaultShapeUtils })
+  );
+  const [loadingState, setLoadingState] = useState<
+    | { status: "loading" }
+    | { status: "ready" }
+    | { status: "error"; error: string }
+  >({
+    status: "loading",
+  });
+
+  useLayoutEffect(() => {
+    setLoadingState({ status: "loading" });
+
+    // Get persisted data from local storage
+    const persistedSnapshot = localStorage.getItem(PERSISTENCE_KEY);
+
+    if (persistedSnapshot) {
+      try {
+        const snapshot = JSON.parse(persistedSnapshot);
+        store.loadSnapshot(snapshot);
+        setLoadingState({ status: "ready" });
+      } catch (error: any) {
+        setLoadingState({ status: "error", error: error.message }); // Something went wrong
+      }
+    } else {
+      setLoadingState({ status: "ready" }); // Nothing persisted, continue with the empty store
+    }
+
+    // Each time the store changes, run the (debounced) persist function
+    const cleanupFn = store.listen(
+      throttle(() => {
+        const snapshot = store.getSnapshot();
+        localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(snapshot));
+      }, 500)
+    );
+
+    return () => {
+      cleanupFn();
+    };
+  }, [store]);
+
+  if (loadingState.status === "loading") {
+    return (
+      <div className="tldraw__editor">
+        <h2>Loading...</h2>
+      </div>
+    );
+  }
+
+  if (loadingState.status === "error") {
+    return (
+      <div className="tldraw__editor">
+        <h2>Error!</h2>
+        <p>{loadingState.error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tldraw__editor">
+      <Tldraw
+        // persistenceKey="tldraw_screenshot_example"
+        tools={customTools}
+        overrides={customUiOverrides}
+        assetUrls={customAssetUrls}
+        components={customComponents}
+        store={store}
+      />
+    </div>
+  );
 }
 
 /*

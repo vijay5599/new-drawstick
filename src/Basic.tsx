@@ -1,82 +1,77 @@
 import {
-  BaseBoxShapeUtil,
-  Editor,
-  HTMLContainer,
-  TLBaseShape,
   Tldraw,
-} from '@tldraw/tldraw';
-import '@tldraw/tldraw/tldraw.css';
-import { useCallback } from 'react';
+  createTLStore,
+  defaultShapeUtils,
+  throttle,
+} from "@tldraw/tldraw";
+import "@tldraw/tldraw/tldraw.css";
+import { useLayoutEffect, useState } from "react";
 
-export type IDangerousHtmlShape = TLBaseShape<
-  'html',
-  {
-    w: number;
-    h: number;
-    html: string;
-  }
->;
-
-class DangerousHtmlExample extends BaseBoxShapeUtil<IDangerousHtmlShape> {
-  static override type = 'html' as const;
-
-  override getDefaultProps() {
-    return {
-      type: 'html',
-      w: 500,
-      h: 300,
-      html: '<div>hello</div>',
-    };
-  }
-
-  override component(shape: IDangerousHtmlShape) {
-    return (
-      <HTMLContainer style={{ overflow: 'auto' }}>
-        <div dangerouslySetInnerHTML={{ __html: shape.props.html }}></div>
-      </HTMLContainer>
-    );
-  }
-
-  override indicator(shape: IDangerousHtmlShape) {
-    return <rect width={shape.props.w} height={shape.props.h} />;
-  }
-}
+const PERSISTENCE_KEY = "vijay-3";
 
 export default function BasicExample() {
-  const handleMount = useCallback((editor: Editor) => {
-    // We will register a new handler for text content. When a user pastes `text/html` content into the editor,
-    // we will create a new shape with that html content.
-    // To test this copy some html content from VS Code or some other text editor.
-    editor.registerExternalContentHandler(
-      'text',
-      async ({ point, sources }) => {
-        const htmlSource = sources?.find(
-          (s) => s.type === 'text' && s.subtype === 'html'
-        );
+  const [store] = useState(() =>
+    createTLStore({ shapeUtils: defaultShapeUtils })
+  );
+  const [loadingState, setLoadingState] = useState<
+    | { status: "loading" }
+    | { status: "ready" }
+    | { status: "error"; error: string }
+  >({
+    status: "loading",
+  });
 
-        if (htmlSource) {
-          const center = point ?? editor.getViewportPageCenter();
+  useLayoutEffect(() => {
+    setLoadingState({ status: "loading" });
 
-          editor.createShape({
-            type: 'html',
-            x: center.x - 250,
-            y: center.y - 150,
-            props: {
-              html: htmlSource.data,
-            },
-          });
-        }
+    // Get persisted data from local storage
+    const persistedSnapshot = localStorage.getItem(PERSISTENCE_KEY);
+
+    if (persistedSnapshot) {
+      try {
+        const snapshot = JSON.parse(persistedSnapshot);
+        store.loadSnapshot(snapshot);
+        setLoadingState({ status: "ready" });
+      } catch (error: any) {
+        setLoadingState({ status: "error", error: error.message }); // Something went wrong
       }
+    } else {
+      setLoadingState({ status: "ready" }); // Nothing persisted, continue with the empty store
+    }
+
+    // Each time the store changes, run the (debounced) persist function
+    const cleanupFn = store.listen(
+      throttle(() => {
+        const snapshot = store.getSnapshot();
+        localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(snapshot));
+      }, 500)
     );
-  }, []);
+
+    return () => {
+      cleanupFn();
+    };
+  }, [store]);
+
+  if (loadingState.status === "loading") {
+    return (
+      <div className="tldraw__editor">
+        <h2>Loading...</h2>
+      </div>
+    );
+  }
+
+  if (loadingState.status === "error") {
+    return (
+      <div className="tldraw__editor">
+        <h2>Error!</h2>
+        <p>{loadingState.error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="tldraw__editor">
-      <Tldraw
-        autoFocus
-        onMount={handleMount}
-        shapeUtils={[DangerousHtmlExample]}
-      />
+      <Tldraw store={store} />
     </div>
   );
 }
