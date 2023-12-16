@@ -21,4 +21,4 @@ Drawstick is a ReactJS-based drawing tool that offers a versatile and interactiv
 
 1. Clone the repository.
    ```bash
-   git clone (https://github.com/vijay5599/new-drawstick.git)https://github.com/vijay5599/new-drawstick.git
+   git clone https://github.com/vijay5599/new-drawstick.git
