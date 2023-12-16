@@ -1,10 +1,12 @@
-import BasicExample from "./Basic";
+// import BasicExample from "./Basic";
+import ScreenshotToolExample from "./ScreenshotToolExample/ScreenshotToolExample";
 // import './App.css'
 
 function App() {
   return (
     <div>
-      <BasicExample />
+      {/* <BasicExample /> */}
+      <ScreenshotToolExample />
     </div>
   );
 }
